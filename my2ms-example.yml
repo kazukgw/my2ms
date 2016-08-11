@@ -1,0 +1,25 @@
+---
+event_buffer_num: 1000
+
+log:
+  level: info
+  out: output file
+
+canal:
+  host: mysqlhost
+  user: mysqluser
+  password: password
+  table_db: database
+  tables:
+    - table_1
+    - table_2
+  dump_execution_path: dump_execution_path
+
+mssql:
+  server: server_host
+  database: databasename
+  user: user
+  password: password
+
+migration_map:
+  test_table: "test_table"
