@@ -1,0 +1,32 @@
+package: github.com/kazukgw/my2ms
+import:
+- package: github.com/Masterminds/squirrel
+- package: github.com/Sirupsen/logrus
+  version: ^0.10.0
+- package: github.com/davecgh/go-spew
+  version: ^1.0.0
+  subpackages:
+  - spew
+- package: github.com/denisenkom/go-mssqldb
+- package: github.com/google/uuid
+  version: ^0.1.0
+- package: github.com/jinzhu/gorm
+  version: ^1.0.0
+  subpackages:
+  - dialects/mssql
+  - dialects/mysql
+- package: github.com/juju/errors
+- package: github.com/manveru/faker
+- package: github.com/siddontang/go-mysql
+  subpackages:
+  - canal
+  - schema
+- package: github.com/spf13/viper
+- package: golang.org/x/net
+  subpackages:
+  - context
+testImport:
+- package: github.com/stretchr/testify
+  version: ^1.1.4
+  subpackages:
+  - assert
