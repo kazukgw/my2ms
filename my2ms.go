@@ -13,6 +13,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/davecgh/go-spew/spew"
 	_ "github.com/denisenkom/go-mssqldb"
+	"github.com/juju/errors"
 	"github.com/siddontang/go-mysql/canal"
 	"github.com/spf13/viper"
 )
@@ -34,21 +35,16 @@ func main() {
 	h := NewMy2MSHandler(conf, log)
 	c.RegRowsEventHandler(h)
 	if err := c.Start(); err != nil {
-		panic(err.Error())
+		log.Error(errors.Trace(err))
 	}
 
-	sigchan := make(chan os.Signal, 1)
+	sigchan := make(chan os.Signal)
 	signal.Notify(
 		sigchan,
 		syscall.SIGTERM,
 		syscall.SIGQUIT,
 	)
-	for {
-		select {
-		case <-sigchan:
-			break
-		}
-	}
+	<-sigchan
 
 	log.Println("quit my2ms")
 }
@@ -93,6 +89,7 @@ func InitLogger(conf *viper.Viper) *logrus.Logger {
 
 func InitCanal(conf *viper.Viper, logger *logrus.Logger) *canal.Canal {
 	canalCfg := canal.NewDefaultConfig()
+	canalCfg.DataDir = conf.GetString("canal.data_dir")
 	canalCfg.Addr = conf.GetString("canal.host")
 	canalCfg.User = conf.GetString("canal.user")
 	canalCfg.Password = conf.GetString("canal.password")
@@ -100,7 +97,7 @@ func InitCanal(conf *viper.Viper, logger *logrus.Logger) *canal.Canal {
 	canalCfg.Dump.Tables = conf.GetStringSlice("canal.tables")
 	canalCfg.Dump.ExecutionPath = conf.GetString("canal.dump_execution_path")
 
-	logger.Debug(spew.Sprintf("canal config:", canalCfg))
+	logger.Debug(spew.Sprint("canal config:", canalCfg))
 	c, err := canal.NewCanal(canalCfg)
 	if err != nil {
 		panic(err.Error())
@@ -113,24 +110,24 @@ func InitCanal(conf *viper.Viper, logger *logrus.Logger) *canal.Canal {
 
 func NewMy2MSHandler(conf *viper.Viper, logger *logrus.Logger) *My2MSHandler {
 	h := &My2MSHandler{}
-	dns := fmt.Sprintf("server=%s;database=%s;user id=%s;password=%s",
+	dns := fmt.Sprint("server=%s;database=%s;user id=%s;password=%s",
 		conf.GetString("mssql.server"),
 		conf.GetString("mssql.database"),
 		conf.GetString("mssql.user"),
 		conf.GetString("mssql.password"),
 	)
 
-	logger.Debug(spew.Sprintf("mssql dns:", dns))
+	logger.Debug(spew.Sprint("mssql dns:", dns))
 	db, err := sql.Open("mssql", dns)
 	if err != nil {
 		panic(err.Error())
 	}
-	logger.Debug(spew.Sprintf("mssql connection:", db))
+	logger.Debug(spew.Sprint("mssql connection:", db))
 	h.MSDB = db
 
 	sb := &SqlBuilder{}
 	mmaps := NewMigrationMapsWithMap(conf.GetStringMapString("migration_map"))
-	logger.Debug(spew.Sprintf("my2ms table maps:", mmaps))
+	logger.Debug(spew.Sprint("my2ms table maps:", mmaps))
 	sb.MigrationMaps = mmaps
 	h.SqlBuilder = sb
 	h.Logger = logger
@@ -149,15 +146,19 @@ func (My2MSHandler) String() string {
 }
 
 func (h *My2MSHandler) Do(e *canal.RowsEvent) error {
+	tx, err := h.MSDB.Begin()
+	if err != nil {
+		return err
+	}
 	sqlsets := h.SqlBuilder.BuildSql(e)
 	for _, sqlset := range *sqlsets {
 		if sqlset.Error != nil {
-			return sqlset.Error
+			return errors.Trace(sqlset.Error)
 		}
-		_, err := h.MSDB.Exec(sqlset.Sql, sqlset.Args...)
+		_, err := tx.Exec(sqlset.Sql, sqlset.Args...)
 		if err != nil {
-			return err
+			return errors.Trace(err)
 		}
 	}
-	return nil
+	return tx.Commit()
 }

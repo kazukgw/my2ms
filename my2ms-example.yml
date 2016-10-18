@@ -6,9 +6,11 @@ log:
   out: output file
 
 canal:
+  data_dir: ./var
   host: mysqlhost
   user: mysqluser
   password: password
+  server_id: 1001
   table_db: database
   tables:
     - table_1

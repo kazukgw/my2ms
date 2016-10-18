@@ -3,6 +3,7 @@ package main
 import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/juju/errors"
 	"github.com/siddontang/go-mysql/canal"
 )
 
@@ -19,7 +20,6 @@ type SqlBuilder struct {
 }
 
 func (sb *SqlBuilder) BuildSql(e *canal.RowsEvent) *SqlSets {
-	spew.Println("rows:", e.Rows)
 	switch e.Action {
 	case canal.InsertAction:
 		return sb.BuildInsert(e)
@@ -41,7 +41,7 @@ func (sb *SqlBuilder) BuildInsert(e *canal.RowsEvent) *SqlSets {
 	}
 	sqlstr, args, err := builder.ToSql()
 
-	return &SqlSets{SqlSet{sqlstr, args, err}}
+	return &SqlSets{SqlSet{sqlstr, args, errors.Trace(err)}}
 }
 
 func (sb *SqlBuilder) BuildUpdate(e *canal.RowsEvent) *SqlSets {
@@ -70,7 +70,7 @@ func (sb *SqlBuilder) BuildUpdate(e *canal.RowsEvent) *SqlSets {
 		pks := mp.PkValue(before)
 		builder = builder.Where(sq.Eq(pks))
 		sqlstr, args, err := builder.ToSql()
-		sqlsets = append(sqlsets, SqlSet{sqlstr, args, err})
+		sqlsets = append(sqlsets, SqlSet{sqlstr, args, errors.Trace(err)})
 	}
 
 	return &sqlsets
@@ -84,7 +84,7 @@ func (sb *SqlBuilder) BuildDelete(e *canal.RowsEvent) *SqlSets {
 		pks := mp.PkValue(r)
 		builder = builder.Where(sq.Eq(pks))
 		sqlstr, args, err := builder.ToSql()
-		sqlsets = append(sqlsets, SqlSet{sqlstr, args, err})
+		sqlsets = append(sqlsets, SqlSet{sqlstr, args, errors.Trace(err)})
 	}
 	return &sqlsets
 
